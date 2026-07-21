@@ -1,32 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { TagDefinition } from "../../game/types";
-
-interface AdminIdentity {
-  id: string;
-  canonicalName: string;
-  kind: string;
-  tags: string[];
-  status: string;
-  source: "seed" | "custom";
-  rightsStatus?: string;
-}
-
-interface CatalogResponse {
-  seedCount: number;
-  seed: AdminIdentity[];
-  tags: TagDefinition[];
-  custom: Array<{
-    id: string;
-    canonical_name: string;
-    kind: string;
-    tags: string[];
-    rights_status: string;
-    status: string;
-  }>;
-  error?: string;
-}
+import { useMemo, useState, type FormEvent } from "react";
+import { expandEffectiveTags, SEED_CATALOG, TAGS } from "../../game/catalog";
+import "./AdminBrowser.css";
 
 interface ImportRow {
   canonicalName: string;
@@ -39,6 +15,18 @@ interface ImportRow {
   imageCredit?: string;
   rightsNotes?: string;
 }
+
+const tagLabels = new Map(TAGS.map((tag) => [tag.slug, tag.label]));
+const builtInIdentities = SEED_CATALOG
+  .map((identity) => ({ ...identity, effectiveTags: expandEffectiveTags(identity.tags) }))
+  .sort((left, right) => left.canonicalName.localeCompare(right.canonicalName));
+const tagCounts = new Map(
+  TAGS.map((tag) => [tag.slug, builtInIdentities.filter((identity) => identity.effectiveTags.includes(tag.slug)).length]),
+);
+const categoryGroups = [...new Set(TAGS.map((tag) => tag.facet))].map((facet) => ({
+  facet,
+  tags: TAGS.filter((tag) => tag.facet === facet),
+}));
 
 function parseCsv(text: string): ImportRow[] {
   const rows = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((row) => row.trim());
@@ -67,8 +55,8 @@ function parseCsv(text: string): ImportRow[] {
       kind,
       imageUrl: field("imageurl"),
       sourceUrl: field("sourceurl"),
-      tags: field("tags").split("|").map((value) => value.trim()).filter(Boolean),
-      aliases: field("aliases").split("|").map((value) => value.trim()).filter(Boolean),
+      tags: field("tags").split("|").map((entry) => entry.trim()).filter(Boolean),
+      aliases: field("aliases").split("|").map((entry) => entry.trim()).filter(Boolean),
       publish: ["true", "1", "yes", "published"].includes(field("publish").toLowerCase()),
       imageCredit: field("imagecredit"),
       rightsNotes: field("rightsnotes"),
@@ -77,45 +65,25 @@ function parseCsv(text: string): ImportRow[] {
 }
 
 export function AdminClient() {
-  const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
-  const [selectedTag, setSelectedTag] = useState("");
-  const [categorySearch, setCategorySearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [identitySearch, setIdentitySearch] = useState("");
 
-  const categoryIdentities = useMemo<AdminIdentity[]>(() => [
-    ...(catalog?.seed ?? []),
-    ...(catalog?.custom ?? []).map((identity) => ({
-      id: identity.id,
-      canonicalName: identity.canonical_name,
-      kind: identity.kind,
-      tags: identity.tags,
-      status: identity.status,
-      source: "custom" as const,
-      rightsStatus: identity.rights_status,
-    })),
-  ], [catalog]);
-  const activeTag = selectedTag || catalog?.tags[0]?.slug || "";
-  const activeTagDefinition = catalog?.tags.find((tag) => tag.slug === activeTag);
-  const visibleCategoryIdentities = categoryIdentities.filter((identity) =>
-    identity.tags.includes(activeTag)
-    && identity.canonicalName.toLowerCase().includes(categorySearch.trim().toLowerCase()),
-  );
-
-  async function load() {
-    const response = await fetch("/api/admin/catalog");
-    const data = await response.json() as CatalogResponse;
-    if (!response.ok) setError(data.error ?? "Admin access is unavailable.");
-    else { setCatalog(data); setError(""); }
-  }
-
-  useEffect(() => {
-    queueMicrotask(() => load().catch(() => setError("Admin access is unavailable.")));
-  }, []);
+  const visibleIdentities = useMemo(() => {
+    const query = identitySearch.trim().toLocaleLowerCase();
+    return builtInIdentities.filter((identity) => {
+      const matchesCategory = selectedCategory === "all" || identity.effectiveTags.includes(selectedCategory);
+      const matchesSearch = !query || [identity.canonicalName, ...identity.aliases]
+        .some((name) => name.toLocaleLowerCase().includes(query));
+      return matchesCategory && matchesSearch;
+    });
+  }, [identitySearch, selectedCategory]);
 
   async function importRows(rows: ImportRow[]) {
     setBusy(true);
+    setError("");
     let imported = 0;
     const failures: string[] = [];
     for (const [index, row] of rows.entries()) {
@@ -134,8 +102,8 @@ export function AdminClient() {
       }
     }
     setProgress(`COMPLETE: ${imported} IMPORTED / ${failures.length} FAILED${failures.length ? ` — ${failures.join("; ")}` : ""}`);
+    if (failures.length) setError("Some records could not be imported. See the batch report.");
     setBusy(false);
-    await load();
   }
 
   async function submitManual(event: FormEvent<HTMLFormElement>) {
@@ -155,16 +123,15 @@ export function AdminClient() {
     event.currentTarget.reset();
   }
 
-  async function unpublish(id: string) {
-    await fetch("/api/admin/unpublish", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
-    await load();
-  }
-
   return (
     <section className="admin-shell">
-      <div className="section-heading"><div><p className="eyebrow">PROTECTED CONTENT DESK</p><h1>Identity library</h1></div><span className="counter">{catalog ? `${catalog.seedCount} SEED / ${catalog.custom.length} CUSTOM` : "CONNECTING"}</span></div>
-      <div className="rights-warning panel-raised"><strong>MEDIA NOTICE</strong><p>Remote images are copied into R2 and recorded as rights status “unknown.” Source tracking does not grant permission. Unpublish or replace disputed media immediately.</p></div>
+      <div className="section-heading">
+        <div><p className="eyebrow">PROTECTED CONTENT DESK</p><h1>Identity library</h1></div>
+        <span className="counter">{builtInIdentities.length} BUILT IN</span>
+      </div>
+      <div className="rights-warning panel-raised"><strong>MEDIA NOTICE</strong><p>Remote images are copied into R2 and recorded with unknown rights status. Source tracking does not grant permission. Unpublish or replace disputed media immediately.</p></div>
       {error ? <div className="form-error" role="alert">{error}</div> : null}
+
       <div className="admin-grid">
         <form className="admin-form panel-raised" onSubmit={submitManual}>
           <p className="eyebrow">SINGLE RECORD</p><h2>Add identity</h2>
@@ -187,36 +154,35 @@ export function AdminClient() {
           <a className="button" href="data:text/csv;charset=utf-8,canonicalName%2Ckind%2CimageUrl%2CsourceUrl%2Ctags%2Caliases%2Cpublish%0AMega%20Man%2Cfictional%2Chttps%3A%2F%2Fexample.com%2Fimage.jpg%2Chttps%3A%2F%2Fexample.com%2Cfictional-character%7Cvideo-games%2CRockman%2Cfalse" download="spiffier-identities-template.csv">DOWNLOAD TEMPLATE</a>
           {progress ? <pre className="import-progress panel-sunken">{progress}</pre> : null}
         </section>
-
-        <section className="taxonomy-panel panel-raised">
-          <p className="eyebrow">CONTROLLED VOCABULARY</p><h2>Tag taxonomy</h2>
-          <p>Select any category to inspect every matching identity, including matches added by tag implications.</p>
-          {[...new Set((catalog?.tags ?? []).map((tag) => tag.facet))].map((facet) => <div className="taxonomy-group" key={facet}><strong>{facet}</strong><div>{catalog?.tags.filter((tag) => tag.facet === facet).map((tag) => {
-            const count = categoryIdentities.filter((identity) => identity.tags.includes(tag.slug)).length;
-            return <button className={activeTag === tag.slug ? "is-selected" : ""} type="button" key={tag.slug} aria-pressed={activeTag === tag.slug} onClick={() => { setSelectedTag(tag.slug); setCategorySearch(""); }}>{tag.label} <span>{count}</span>{tag.implies?.length ? <small> → {tag.implies.join(", ")}</small> : null}</button>;
-          })}</div></div>)}
-        </section>
       </div>
 
-      <section className="category-browser panel-raised">
-        <div className="section-heading compact">
-          <div><p className="eyebrow">CATEGORY MEMBERS</p><h2>{activeTagDefinition?.label ?? "Select a category"}</h2></div>
-          <span className="counter">{visibleCategoryIdentities.length} SHOWN</span>
+      <section className="identity-browser-card panel-raised" aria-labelledby="identity-browser-title">
+        <div className="identity-browser-heading">
+          <div><p className="eyebrow">BUILT-IN LIBRARY</p><h2 id="identity-browser-title">Identity browser</h2></div>
+          <span className="counter">{visibleIdentities.length} OF {builtInIdentities.length}</span>
         </div>
-        <label className="category-search">FILTER PEOPLE<input value={categorySearch} onChange={(event) => setCategorySearch(event.target.value)} placeholder="TYPE A NAME" /></label>
-        <div className="category-people panel-sunken">
-          {visibleCategoryIdentities.length ? visibleCategoryIdentities.map((identity) => (
-            <div className="category-person" key={`${identity.source}:${identity.id}`}>
-              <strong>{identity.canonicalName}</strong>
-              <span>{identity.kind.replace("-", " ")} / {identity.source}{identity.source === "custom" ? ` / ${identity.status}` : ""}</span>
-            </div>
-          )) : <p>No identities match this category and search.</p>}
-        </div>
-      </section>
 
-      <section className="library-table panel-raised">
-        <div className="section-heading compact"><div><p className="eyebrow">DATABASE RECORDS</p><h2>Custom identities</h2></div></div>
-        {catalog?.custom.length ? catalog.custom.map((identity) => <div className="library-row" key={identity.id}><strong>{identity.canonical_name}</strong><span>{identity.kind}</span><span>{identity.rights_status}</span><span>{identity.status}</span><button className="button button-compact" disabled={identity.status === "unpublished"} onClick={() => unpublish(identity.id)}>UNPUBLISH</button></div>) : <p>No custom records yet. The built-in 400-entry catalog remains available to games.</p>}
+        <div className="identity-browser-toolbar">
+          <label>SEARCH IDENTITIES<input value={identitySearch} onChange={(event) => setIdentitySearch(event.target.value)} placeholder="NAME OR ALIAS" /></label>
+          <label>CATEGORY<select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
+            <option value="all">ALL IDENTITIES ({builtInIdentities.length})</option>
+            {categoryGroups.map((group) => <optgroup label={group.facet.toUpperCase()} key={group.facet}>{group.tags.map((tag) => <option value={tag.slug} key={tag.slug}>{tag.label.toUpperCase()} ({tagCounts.get(tag.slug) ?? 0})</option>)}</optgroup>)}
+          </select></label>
+        </div>
+
+        <div className="identity-browser-results panel-sunken" role="list" aria-live="polite">
+          {visibleIdentities.length ? visibleIdentities.map((identity) => (
+            <article className="identity-browser-entry" role="listitem" key={identity.id}>
+              <div className="identity-browser-entry-heading">
+                <h3>{identity.canonicalName}</h3>
+                <span>{identity.kind === "real" ? "REAL" : identity.kind.toUpperCase()}</span>
+              </div>
+              <div className="identity-browser-tags">
+                {identity.tags.slice(0, 4).map((tag) => <span key={tag}>{tagLabels.get(tag) ?? tag}</span>)}
+              </div>
+            </article>
+          )) : <p className="identity-browser-empty">No built-in identities match these filters.</p>}
+        </div>
       </section>
     </section>
   );

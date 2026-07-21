@@ -34,3 +34,15 @@ test("server-renders the host and join desk", async () => {
   assert.match(html, /Guess the Person/i);
   assert.doesNotMatch(html, /ASK IN DISCORD|GROUP VOTES|LOW SCORE WINS/i);
 });
+
+test("server-renders the organized built-in identity browser", async () => {
+  const response = await render("/admin");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Identity browser/i);
+  assert.match(html, /400(?:<!-- -->)? BUILT IN/i);
+  assert.match(html, /ALL IDENTITIES/i);
+  assert.match(html, /Mario/i);
+  assert.match(html, /Adam Sandler/i);
+  assert.doesNotMatch(html, /Select a category|Tag taxonomy|Custom identities/i);
+});
