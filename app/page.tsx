@@ -6,27 +6,6 @@ export default function Home() {
   return (
     <main className="site-shell">
       <SiteHeader />
-      <section className="hero panel-raised" aria-labelledby="hub-title">
-        <div>
-          <p className="eyebrow">SOCIAL GAME DESK / BUILD 01</p>
-          <h1 id="hub-title">Good games.<br />Bad guesses.</h1>
-          <p className="hero-copy">
-            Keep Discord open. Put this beside it. Host a room, hand your friends impossible identities,
-            and let the group decide who guessed correctly.
-          </p>
-          <Link className="button button-primary button-large" href="/games/guess-the-celebrity">
-            OPEN GAME DESK →
-          </Link>
-        </div>
-        <div className="status-terminal panel-sunken" aria-label="Service summary">
-          <div className="terminal-row"><span>TRANSPORT</span><strong>ROOM SOCKET</strong></div>
-          <div className="terminal-row"><span>VOICE</span><strong>DISCORD</strong></div>
-          <div className="terminal-row"><span>SCORING</span><strong>LOWEST WINS</strong></div>
-          <div className="terminal-row"><span>ROOMS</span><strong>PRIVATE</strong></div>
-          <p className="terminal-note">NO DOWNLOAD. NO PUBLIC LOBBY. NO CHAT BOT.</p>
-        </div>
-      </section>
-
       <section className="section-block" aria-labelledby="games-title">
         <div className="section-heading">
           <div>
@@ -39,7 +18,7 @@ export default function Home() {
           {GAME_MANIFESTS.map((game, index) => (
             <article className={`game-card panel-raised ${game.availability !== "playable" ? "is-disabled" : ""}`} key={game.id}>
               <div className="game-number">0{index + 1}</div>
-              <p className="eyebrow">{game.minPlayers}–{game.maxPlayers} PLAYERS</p>
+              <p className="eyebrow">{game.availability === "playable" ? `${game.minPlayers}–${game.maxPlayers} PLAYERS` : "UNRELEASED"}</p>
               <h3>{game.title}</h3>
               <p>{game.description}</p>
               {game.availability === "playable" ? (

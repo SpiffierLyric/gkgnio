@@ -117,7 +117,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
           <p className="eyebrow">SESSION UNAVAILABLE</p>
           <h1>Rejoin the room</h1>
           <p>{error || "This browser does not have a valid private resume token for this room."}</p>
-          <Link className="button button-primary" href="/games/guess-the-celebrity">RETURN TO JOIN DESK</Link>
+          <Link className="button button-primary" href="/games/guess-the-person">RETURN TO JOIN DESK</Link>
         </section>
       </main>
     );

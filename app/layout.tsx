@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Spiffier Games",
       description: "A no-nonsense multiplayer game desk for Discord nights.",
       type: "website",
-      images: [{ url: imageUrl, width: 1734, height: 909, alt: "Spiffier Games — Good games. Bad guesses." }],
+      images: [{ url: imageUrl, width: 1734, height: 909, alt: "Spiffier Games multiplayer game hub." }],
     },
     twitter: { card: "summary_large_image", images: [imageUrl] },
   };

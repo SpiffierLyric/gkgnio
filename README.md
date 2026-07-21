@@ -1,6 +1,6 @@
 # Spiffier Games
 
-Spiffier Games is a desktop-first Discord companion for private social games. The first game is Guess the Celebrity: every player sees everyone else's identity, asks questions over Discord voice chat, and tries to solve their own identity in the fewest turns.
+Spiffier Games is a desktop-first Discord companion for private social games. The first game is Guess the Person: every player sees everyone else's identity, asks questions over Discord voice chat, and tries to solve their own identity in the fewest turns.
 
 ## What is included
 
@@ -8,7 +8,7 @@ Spiffier Games is a desktop-first Discord companion for private social games. Th
 - Password-protected, unlisted rooms for 3–12 players
 - Server-authoritative Cloudflare Durable Object room state and hibernating WebSockets
 - Resume tokens, reconnect reservations, host transfer, room expiry, and idempotent revision-checked commands
-- Multi-round Guess the Celebrity with All/Any tag filters, two-slot turns, overtime, hidden group voting, caps, late-join penalties, results, standings, and rematches
+- Multi-round Guess the Person with All/Any tag filters, two-slot turns, overtime, hidden group voting, caps, late-join penalties, results, standings, and rematches
 - A 400-identity starter catalog across games, animation/anime, live action, and real people
 - D1 taxonomy/content schema, protected admin editor, sequential CSV import, and R2 image ingestion/cache
 - Guest play and optional Discord OAuth using only the `identify` scope

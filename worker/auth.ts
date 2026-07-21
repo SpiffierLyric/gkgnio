@@ -121,7 +121,7 @@ export async function authRoutes(request: Request, env: AppEnv): Promise<Respons
     return new Response(null, {
       status: 302,
       headers: {
-        location: "/games/guess-the-celebrity",
+        location: "/games/guess-the-person",
         "set-cookie": `spiffier_session=${payload}.${signature}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${secureCookie(request)}`,
       },
     });

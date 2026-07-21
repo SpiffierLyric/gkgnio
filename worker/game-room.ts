@@ -750,7 +750,7 @@ export class GameRoom {
     const vote = this.room.vote;
     return {
       roomName: this.room.roomName,
-      gameId: "guess-celebrity",
+      gameId: "guess-person",
       revision: this.room.revision,
       status: this.room.status,
       viewerId,

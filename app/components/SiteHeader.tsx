@@ -27,7 +27,7 @@ export function SiteHeader() {
       </Link>
       <nav aria-label="Primary navigation">
         <Link href="/">HUB</Link>
-        <Link href="/games/guess-the-celebrity">PLAY</Link>
+        <Link href="/games/guess-the-person">PLAY</Link>
         <Link href="/admin">ADMIN</Link>
       </nav>
       <div className="account-block">

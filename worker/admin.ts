@@ -1,4 +1,4 @@
-import { SEED_CATALOG, TAGS } from "../game/catalog";
+import { expandEffectiveTags, SEED_CATALOG, TAGS } from "../game/catalog";
 import type { CatalogIdentity } from "../game/types";
 import type { AppEnv } from "./env";
 import { fetchValidatedImage } from "./media";
@@ -75,10 +75,27 @@ export async function adminRoute(request: Request, env: AppEnv): Promise<Respons
     try {
       await ensureTaxonomy(env);
       const custom = await env.DB.prepare(
-        `SELECT id, canonical_name, kind, image_key, image_source_url, rights_status, status, updated_at
-         FROM identities ORDER BY updated_at DESC LIMIT 500`,
+        `SELECT i.id, i.canonical_name, i.kind, i.image_key, i.image_source_url, i.rights_status, i.status,
+                i.updated_at, GROUP_CONCAT(t.slug) AS tag_slugs
+         FROM identities i
+         LEFT JOIN identity_tags it ON it.identity_id = i.id
+         LEFT JOIN tags t ON t.id = it.tag_id
+         GROUP BY i.id
+         ORDER BY i.updated_at DESC LIMIT 500`,
       ).all();
-      return Response.json({ seedCount: SEED_CATALOG.length, tags: TAGS, custom: custom.results });
+      const customIdentities = custom.results.map((row) => ({
+        ...row,
+        tags: expandEffectiveTags(String((row as Record<string, unknown>).tag_slugs ?? "").split(",").filter(Boolean)),
+      }));
+      const seed = SEED_CATALOG.map((identity) => ({
+        id: identity.id,
+        canonicalName: identity.canonicalName,
+        kind: identity.kind,
+        tags: expandEffectiveTags(identity.tags),
+        status: "published",
+        source: "seed",
+      }));
+      return Response.json({ seedCount: seed.length, seed, tags: TAGS, custom: customIdentities });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : "Apply the database migration first." }, { status: 503 });
     }

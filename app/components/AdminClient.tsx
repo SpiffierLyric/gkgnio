@@ -1,12 +1,30 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { TagDefinition } from "../../game/types";
+
+interface AdminIdentity {
+  id: string;
+  canonicalName: string;
+  kind: string;
+  tags: string[];
+  status: string;
+  source: "seed" | "custom";
+  rightsStatus?: string;
+}
 
 interface CatalogResponse {
   seedCount: number;
+  seed: AdminIdentity[];
   tags: TagDefinition[];
-  custom: Array<Record<string, string>>;
+  custom: Array<{
+    id: string;
+    canonical_name: string;
+    kind: string;
+    tags: string[];
+    rights_status: string;
+    status: string;
+  }>;
   error?: string;
 }
 
@@ -63,6 +81,27 @@ export function AdminClient() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
+  const [selectedTag, setSelectedTag] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
+
+  const categoryIdentities = useMemo<AdminIdentity[]>(() => [
+    ...(catalog?.seed ?? []),
+    ...(catalog?.custom ?? []).map((identity) => ({
+      id: identity.id,
+      canonicalName: identity.canonical_name,
+      kind: identity.kind,
+      tags: identity.tags,
+      status: identity.status,
+      source: "custom" as const,
+      rightsStatus: identity.rights_status,
+    })),
+  ], [catalog]);
+  const activeTag = selectedTag || catalog?.tags[0]?.slug || "";
+  const activeTagDefinition = catalog?.tags.find((tag) => tag.slug === activeTag);
+  const visibleCategoryIdentities = categoryIdentities.filter((identity) =>
+    identity.tags.includes(activeTag)
+    && identity.canonicalName.toLowerCase().includes(categorySearch.trim().toLowerCase()),
+  );
 
   async function load() {
     const response = await fetch("/api/admin/catalog");
@@ -151,9 +190,29 @@ export function AdminClient() {
 
         <section className="taxonomy-panel panel-raised">
           <p className="eyebrow">CONTROLLED VOCABULARY</p><h2>Tag taxonomy</h2>
-          {[...new Set((catalog?.tags ?? []).map((tag) => tag.facet))].map((facet) => <div className="taxonomy-group" key={facet}><strong>{facet}</strong><div>{catalog?.tags.filter((tag) => tag.facet === facet).map((tag) => <span key={tag.slug}>{tag.label}{tag.implies?.length ? ` → ${tag.implies.join(", ")}` : ""}</span>)}</div></div>)}
+          <p>Select any category to inspect every matching identity, including matches added by tag implications.</p>
+          {[...new Set((catalog?.tags ?? []).map((tag) => tag.facet))].map((facet) => <div className="taxonomy-group" key={facet}><strong>{facet}</strong><div>{catalog?.tags.filter((tag) => tag.facet === facet).map((tag) => {
+            const count = categoryIdentities.filter((identity) => identity.tags.includes(tag.slug)).length;
+            return <button className={activeTag === tag.slug ? "is-selected" : ""} type="button" key={tag.slug} aria-pressed={activeTag === tag.slug} onClick={() => { setSelectedTag(tag.slug); setCategorySearch(""); }}>{tag.label} <span>{count}</span>{tag.implies?.length ? <small> → {tag.implies.join(", ")}</small> : null}</button>;
+          })}</div></div>)}
         </section>
       </div>
+
+      <section className="category-browser panel-raised">
+        <div className="section-heading compact">
+          <div><p className="eyebrow">CATEGORY MEMBERS</p><h2>{activeTagDefinition?.label ?? "Select a category"}</h2></div>
+          <span className="counter">{visibleCategoryIdentities.length} SHOWN</span>
+        </div>
+        <label className="category-search">FILTER PEOPLE<input value={categorySearch} onChange={(event) => setCategorySearch(event.target.value)} placeholder="TYPE A NAME" /></label>
+        <div className="category-people panel-sunken">
+          {visibleCategoryIdentities.length ? visibleCategoryIdentities.map((identity) => (
+            <div className="category-person" key={`${identity.source}:${identity.id}`}>
+              <strong>{identity.canonicalName}</strong>
+              <span>{identity.kind.replace("-", " ")} / {identity.source}{identity.source === "custom" ? ` / ${identity.status}` : ""}</span>
+            </div>
+          )) : <p>No identities match this category and search.</p>}
+        </div>
+      </section>
 
       <section className="library-table panel-raised">
         <div className="section-heading compact"><div><p className="eyebrow">DATABASE RECORDS</p><h2>Custom identities</h2></div></div>
