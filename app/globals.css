@@ -79,6 +79,9 @@ input, select, textarea {
 textarea { resize: vertical; }
 
 .site-shell { margin: 0 auto; max-width: 1440px; padding: 18px; }
+.home-shell { isolation: isolate; position: relative; }
+.home-dot-field { inset: 0; opacity: .62; overflow: hidden; pointer-events: none; position: fixed; z-index: 0; }
+.home-content { position: relative; z-index: 1; }
 .site-header { align-items: center; display: grid; grid-template-columns: 1fr auto 1fr; margin-bottom: 30px; min-height: 72px; padding: 9px 13px; position: relative; z-index: 5; }
 .brand { align-items: center; display: flex; font: 900 .76rem/1.05 "Courier New", monospace; gap: 9px; text-decoration: none; }
 .brand-mark { align-items: center; background: var(--black); color: var(--white); display: inline-flex; font-size: .85rem; height: 40px; justify-content: center; width: 40px; }

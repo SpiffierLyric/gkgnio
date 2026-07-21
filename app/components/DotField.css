@@ -1,0 +1,17 @@
+.dot-field-container,
+.dot-field-container canvas,
+.dot-field-container svg {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.dot-field-container {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dot-field-container svg {
+  pointer-events: none;
+}

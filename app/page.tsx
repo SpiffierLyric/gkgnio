@@ -1,12 +1,25 @@
 import Link from "next/link";
+import DotField from "./components/DotField";
 import { SiteHeader } from "./components/SiteHeader";
 import { GAME_MANIFESTS } from "../game/types";
 
 export default function Home() {
   return (
-    <main className="site-shell">
-      <SiteHeader />
-      <section className="section-block" aria-labelledby="games-title">
+    <main className="site-shell home-shell">
+      <div className="home-dot-field" aria-hidden="true">
+        <DotField
+          dotRadius={1.5}
+          dotSpacing={14}
+          bulgeStrength={67}
+          glowRadius={160}
+          gradientFrom="#808080"
+          gradientTo="#808080"
+          glowColor="#f1f1f1"
+        />
+      </div>
+      <div className="home-content">
+        <SiteHeader />
+        <section className="section-block" aria-labelledby="games-title">
         <div className="section-heading">
           <div>
             <p className="eyebrow">PROGRAMS</p>
@@ -29,12 +42,13 @@ export default function Home() {
             </article>
           ))}
         </div>
-      </section>
+        </section>
 
-      <footer className="site-footer">
-        <span>SPIFFIER GAMES</span>
-        <span>BUILT FOR FRIENDS IN VOICE CHAT</span>
-      </footer>
+        <footer className="site-footer">
+          <span>SPIFFIER GAMES</span>
+          <span>BUILT FOR FRIENDS IN VOICE CHAT</span>
+        </footer>
+      </div>
     </main>
   );
 }
