@@ -10,8 +10,11 @@ export default function Home() {
         <DotField
           dotRadius={1.5}
           dotSpacing={14}
-          bulgeStrength={67}
+          cursorRadius={380}
+          bulgeStrength={92}
           glowRadius={160}
+          sparkle
+          waveAmplitude={3}
           gradientFrom="#808080"
           gradientTo="#808080"
           glowColor="#f1f1f1"
