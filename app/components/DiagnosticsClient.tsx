@@ -10,6 +10,7 @@ interface DiagnosticRecord {
   status: number | null;
   contentType: string | null;
   requestId: string;
+  detail: string | null;
 }
 
 export function DiagnosticsClient() {
@@ -37,10 +38,10 @@ export function DiagnosticsClient() {
       {available === null ? <p className="diagnostics-empty">LOADING RECENT EVENTS…</p> : null}
       {available && records.length === 0 ? <p className="diagnostics-empty">NO SERVICE ERRORS RECORDED.</p> : null}
       {records.length > 0 ? <div className="diagnostics-table" role="table" aria-label="Recent service errors">
-        <div className="diagnostics-row diagnostics-heading" role="row"><span>TIME</span><span>EVENT</span><span>ROUTE</span><span>STATUS</span><span>TYPE</span><span>SUPPORT ID</span></div>
+        <div className="diagnostics-row diagnostics-heading" role="row"><span>TIME</span><span>EVENT</span><span>ROUTE</span><span>STATUS</span><span>TYPE / STAGE</span><span>SUPPORT ID</span></div>
         {records.map((record) => <div className="diagnostics-row" role="row" key={record.id}>
           <time dateTime={record.occurredAt}>{new Date(record.occurredAt).toLocaleString()}</time>
-          <span>{record.event}</span><span>{record.route}</span><span>{record.status ?? "—"}</span><span>{record.contentType ?? "—"}</span><code>{record.requestId}</code>
+          <span>{record.event}</span><span>{record.route}</span><span>{record.status ?? "—"}</span><span>{record.contentType ?? "—"}{record.detail ? ` / ${record.detail}` : ""}</span><code>{record.requestId}</code>
         </div>)}
       </div> : null}
     </section>

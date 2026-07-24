@@ -8,6 +8,7 @@ export interface DiagnosticRecord {
   status: number | null;
   contentType: string | null;
   requestId: string;
+  detail: string | null;
 }
 
 const DIAGNOSTICS_OBJECT_NAME = "spiffier-system-diagnostics";

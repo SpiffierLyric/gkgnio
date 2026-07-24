@@ -82,6 +82,7 @@ interface DiagnosticEvent {
   status: number | null;
   contentType: string | null;
   requestId: string;
+  detail: string | null;
 }
 
 function defaultSettings(): GameSettings {
@@ -285,6 +286,8 @@ export class GameRoom {
       return json({ error: "Check the password and player limit." }, 400);
     }
 
+    let stage = "credentials";
+    try {
     const salt = randomToken();
     const token = randomToken();
     const host: InternalPlayer = {
@@ -306,10 +309,12 @@ export class GameRoom {
       totalStrokes: 0,
       totalSlots: 0,
     };
+    stage = "password";
+    const passwordHash = await derivePassword(body.password, salt);
     this.room = {
       roomName,
       passwordSalt: salt,
-      passwordHash: await derivePassword(body.password, salt),
+      passwordHash,
       playerLimit,
       hostId: host.id,
       revision: 1,
@@ -330,9 +335,13 @@ export class GameRoom {
       failedJoins: {},
       emptySince: Date.now(),
     };
+    stage = "storage";
     await this.persist();
     await this.scheduleAlarm();
     return json({ roomName, playerId: host.id, resumeToken: token }, 201);
+    } catch {
+      return json({ error: "The game service is unavailable. Please try again shortly.", detail: stage }, 503);
+    }
   }
 
   private async recordDiagnostic(request: Request) {
@@ -346,7 +355,8 @@ export class GameRoom {
       ? body.contentType.split(";", 1)[0].toLowerCase().replace(/[^a-z0-9./+-]/g, "").slice(0, 80) || null
       : null;
     const requestId = typeof body.requestId === "string" && /^[a-f0-9-]{8,64}$/i.test(body.requestId) ? body.requestId : crypto.randomUUID();
-    this.diagnostics.push({ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), event, route, status, contentType, requestId });
+    const detail = body.detail === "credentials" || body.detail === "password" || body.detail === "storage" ? body.detail : null;
+    this.diagnostics.push({ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), event, route, status, contentType, requestId, detail });
     this.diagnostics = this.diagnostics.slice(-100);
     await this.state.storage.put("diagnostics", this.diagnostics);
     return json({ ok: true }, 202);

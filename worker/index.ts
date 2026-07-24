@@ -66,12 +66,16 @@ const worker = {
         );
         const contentType = response.headers.get("content-type");
         if (response.status >= 500 || !contentType?.includes("application/json")) {
+          const responseData = contentType?.includes("application/json")
+            ? await response.clone().json().catch(() => null) as { detail?: unknown } | null
+            : null;
           ctx.waitUntil(recordDiagnostic(env, {
             event: "room-service-invalid-response",
             route: url.pathname,
             status: response.status,
             contentType,
             requestId,
+            detail: typeof responseData?.detail === "string" ? responseData.detail : null,
           }));
         }
         return response;
@@ -82,6 +86,7 @@ const worker = {
           status: 500,
           contentType: null,
           requestId,
+          detail: null,
         }));
         return Response.json(
           { error: "The game service is unavailable. Please try again shortly.", requestId },

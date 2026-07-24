@@ -115,7 +115,7 @@ test("diagnostic records keep only the public-safe rolling service metadata", as
   const data = await list.json() as { available: boolean; records: Array<Record<string, unknown>> };
   assert.equal(data.available, true);
   assert.equal(data.records.length, 1);
-  assert.deepEqual(Object.keys(data.records[0]).sort(), ["contentType", "event", "id", "occurredAt", "requestId", "route", "status"]);
+  assert.deepEqual(Object.keys(data.records[0]).sort(), ["contentType", "detail", "event", "id", "occurredAt", "requestId", "route", "status"]);
   assert.equal(data.records[0].contentType, "text/plain");
   assert.equal(data.records[0].route, "/api/rooms/create");
 });
