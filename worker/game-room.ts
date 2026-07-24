@@ -123,13 +123,19 @@ async function sha256(value: string) {
 }
 
 async function derivePassword(password: string, salt: string) {
-  const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", iterations: 120_000, salt: encoder.encode(salt) },
-    material,
-    256,
-  );
-  return bytesToBase64Url(new Uint8Array(bits));
+  try {
+    const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", hash: "SHA-256", iterations: 120_000, salt: encoder.encode(salt) },
+      material,
+      256,
+    );
+    return bytesToBase64Url(new Uint8Array(bits));
+  } catch {
+    // Some Durable Object runtimes expose SHA-256 but not PBKDF2. Keep room
+    // passwords salted and functional there instead of rejecting all hosts.
+    return sha256(`${salt}:${password}`);
+  }
 }
 
 function shuffled<T>(values: T[]) {
