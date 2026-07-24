@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import { SEED_CATALOG, TAGS } from "../game/catalog";
 import { adminRoute } from "./admin";
 import { authRoutes } from "./auth";
+import { diagnosticsRoute, recordDiagnostic } from "./diagnostics";
 import type { AppEnv } from "./env";
 import { GameRoom } from "./game-room";
 import { mediaRoute } from "./media";
@@ -28,6 +29,9 @@ const worker = {
     const authResponse = await authRoutes(request, env);
     if (authResponse) return authResponse;
 
+    const diagnosticsResponse = await diagnosticsRoute(request, env);
+    if (diagnosticsResponse) return diagnosticsResponse;
+
     const adminResponse = await adminRoute(request, env);
     if (adminResponse) return adminResponse;
 
@@ -48,16 +52,42 @@ const worker = {
         return Response.json({ error: "Invalid request." }, { status: 400 });
       }
       if (roomName.length < 3 || roomName.length > 32) return Response.json({ error: "Check the room name." }, { status: 400 });
-      const id = env.ROOMS.idFromName(roomName.toLocaleLowerCase("en-US"));
-      const stub = env.ROOMS.get(id);
       const action = url.pathname.endsWith("create") ? "create" : "join";
-      return stub.fetch(
-        new Request(`https://room.internal/${action}`, {
-          method: "POST",
-          headers: request.headers,
-          body: bodyText,
-        }),
-      );
+      const requestId = crypto.randomUUID();
+      try {
+        const id = env.ROOMS.idFromName(roomName.toLocaleLowerCase("en-US"));
+        const stub = env.ROOMS.get(id);
+        const response = await stub.fetch(
+          new Request(`https://room.internal/${action}`, {
+            method: "POST",
+            headers: request.headers,
+            body: bodyText,
+          }),
+        );
+        const contentType = response.headers.get("content-type");
+        if (response.status >= 500 || !contentType?.includes("application/json")) {
+          ctx.waitUntil(recordDiagnostic(env, {
+            event: "room-service-invalid-response",
+            route: url.pathname,
+            status: response.status,
+            contentType,
+            requestId,
+          }));
+        }
+        return response;
+      } catch {
+        ctx.waitUntil(recordDiagnostic(env, {
+          event: "room-service-exception",
+          route: url.pathname,
+          status: 500,
+          contentType: null,
+          requestId,
+        }));
+        return Response.json(
+          { error: "The game service is unavailable. Please try again shortly.", requestId },
+          { status: 503, headers: { "x-spiffier-request-id": requestId } },
+        );
+      }
     }
 
     const socketMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/socket$/);

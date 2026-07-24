@@ -94,3 +94,17 @@ export const identityTags = sqliteTable(
     index("identity_tags_tag_idx").on(table.tagId),
   ],
 );
+
+export const diagnosticEvents = sqliteTable(
+  "diagnostic_events",
+  {
+    id: text("id").primaryKey(),
+    occurredAt: text("occurred_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    event: text("event").notNull(),
+    route: text("route").notNull(),
+    status: integer("status"),
+    contentType: text("content_type"),
+    requestId: text("request_id").notNull(),
+  },
+  (table) => [index("diagnostic_events_occurred_at_idx").on(table.occurredAt)],
+);

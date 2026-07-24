@@ -232,6 +232,15 @@ textarea { resize: vertical; }
 .vote-dialog small { display: block; font: .66rem/1.4 "Courier New", monospace; margin-top: 18px; }
 
 .admin-shell { padding: 35px 0; }
+.diagnostics-panel { margin: 35px 0; padding: 24px; }
+.diagnostics-note, .diagnostics-empty { font: .74rem/1.5 "Courier New", monospace; max-width: 850px; }
+.diagnostics-table { border: var(--border); overflow-x: auto; }
+.diagnostics-row { display: grid; font: .68rem/1.35 "Courier New", monospace; grid-template-columns: 180px minmax(190px, 1.5fr) minmax(145px, 1fr) 70px minmax(110px, 1fr) 250px; min-width: 1020px; }
+.diagnostics-row > * { border-right: 1px solid var(--black); padding: 9px; }
+.diagnostics-row > *:last-child { border-right: 0; }
+.diagnostics-row + .diagnostics-row { border-top: 1px solid var(--black); }
+.diagnostics-heading { background: var(--black); color: var(--white); font-weight: 900; }
+.diagnostics-row code { font: inherit; overflow-wrap: anywhere; }
 .rights-warning { align-items: center; display: grid; gap: 20px; grid-template-columns: 150px 1fr; margin-bottom: 20px; padding: 16px; }
 .rights-warning strong { background: var(--black); color: var(--white); font: 800 .75rem "Courier New", monospace; padding: 15px; text-align: center; }
 .rights-warning p { margin: 0; }

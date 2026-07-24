@@ -29,6 +29,7 @@ export function SiteHeader() {
         <Link href="/">HUB</Link>
         <Link href="/games/guess-the-person">PLAY</Link>
         <Link href="/admin">ADMIN</Link>
+        <Link href="/logs">LOGS</Link>
       </nav>
       <div className="account-block">
         {profile ? (
