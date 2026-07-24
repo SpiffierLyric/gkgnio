@@ -64,3 +64,18 @@ test("a reservation expiry is scheduled and exposed in the room snapshot", async
   assert.ok(alarmAt() && alarmAt()! >= player.disconnectedAt + 299_000);
   assert.ok(publicPlayer.reservationExpiresAt && publicPlayer.reservationExpiresAt >= player.disconnectedAt + 300_000);
 });
+
+test("room creation remains available when the runtime has no alarm API", async () => {
+  const { room } = roomHarness();
+  const state = (room as never as { state: { storage: { setAlarm?: unknown } } }).state;
+  delete state.storage.setAlarm;
+
+  const response = await post(room, "create", {
+    roomName: "No alarm support",
+    password: "secret",
+    playerLimit: 3,
+    playerName: "Host",
+  });
+
+  assert.equal(response.status, 201);
+});

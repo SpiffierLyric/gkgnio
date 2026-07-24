@@ -943,7 +943,14 @@ export class GameRoom {
         times.push(player.disconnectedAt + PLAYER_RESERVATION);
       }
     }
-    if (times.length > 0) await this.state.storage.setAlarm(Math.max(now + 1000, Math.min(...times)));
+    // Some hosted Durable Object runtimes provide storage before alarm support
+    // is enabled. A cleanup alarm must never prevent a new room from being
+    // created; the room remains fully usable and scheduling resumes wherever
+    // the runtime exposes the alarm API.
+    const setAlarm = this.state.storage.setAlarm;
+    if (times.length > 0 && typeof setAlarm === "function") {
+      await setAlarm.call(this.state.storage, Math.max(now + 1000, Math.min(...times)));
+    }
   }
 
   private async destroyRoom(reason: string) {
