@@ -49,6 +49,7 @@ export interface PublicPlayer {
   avatarUrl?: string;
   connected: boolean;
   removable: boolean;
+  reservationExpiresAt: number | null;
   isHost: boolean;
   ready: boolean;
   role: "active" | "spectator" | "withdrawn";

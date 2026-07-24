@@ -338,8 +338,19 @@ export class GameRoom {
 
     const playerName = normalizeName(body.playerName ?? "");
     if (playerName.length < 1 || playerName.length > 24) return json({ error: "Choose a player name." }, 400);
-    if (this.room.players.some((player) => player.role !== "withdrawn" && player.name.toLowerCase() === playerName.toLowerCase())) {
-      return json({ error: "That player name is already in the room." }, 409);
+    const matchingPlayer = this.room.players.find((player) => player.role !== "withdrawn" && player.name.toLowerCase() === playerName.toLowerCase());
+    if (matchingPlayer) {
+      if (matchingPlayer.connected || !matchingPlayer.disconnectedAt || Date.now() - matchingPlayer.disconnectedAt >= PLAYER_RESERVATION) {
+        return json({ error: "That player name is already in the room." }, 409);
+      }
+      const token = randomToken();
+      matchingPlayer.tokenHash = await sha256(token);
+      matchingPlayer.avatarUrl = body.avatarUrl ?? matchingPlayer.avatarUrl;
+      matchingPlayer.disconnectedAt = null;
+      this.bump();
+      await this.persist();
+      await this.scheduleAlarm();
+      return json({ roomName: this.room.roomName, playerId: matchingPlayer.id, resumeToken: token, reclaimed: true }, 200);
     }
     if (this.room.players.filter((player) => player.role !== "withdrawn").length >= this.room.playerLimit) {
       return json({ error: "This room is full." }, 409);
@@ -433,6 +444,9 @@ export class GameRoom {
       case "remove-player":
         error = await this.removePlayer(playerId, String((command.payload as { playerId?: string })?.playerId ?? ""));
         break;
+      case "leave":
+        await this.withdrawPlayer(playerId);
+        break;
       case "close-room":
         if (!this.isHost(playerId)) error = "Only the host can close the room.";
         else {
@@ -456,6 +470,8 @@ export class GameRoom {
     this.room.processedCommands = this.room.processedCommands.slice(-100);
     this.bump();
     await this.persistAndBroadcast();
+    await this.scheduleAlarm();
+    if (command.type === "leave") socket.send(JSON.stringify({ type: "left" }));
   }
 
   private toggleReady(playerId: string) {
@@ -713,9 +729,39 @@ export class GameRoom {
     return null;
   }
 
+  private async withdrawPlayer(playerId: string) {
+    if (!this.room) return;
+    const player = this.player(playerId);
+    if (!player || player.role === "withdrawn") return;
+
+    player.role = "withdrawn";
+    player.ready = false;
+    player.dnf = this.room.status === "round";
+    player.solved = this.room.status === "round";
+    player.connected = false;
+    player.disconnectedAt = null;
+    if (this.room.vote?.guesserId === playerId) this.room.vote = null;
+    if (this.room.activePlayerId === playerId) {
+      this.room.activePlayerId = null;
+      this.room.turnDeadlineAt = null;
+      this.room.turnYielded = true;
+    }
+    if (this.room.hostId === playerId) {
+      const successor = this.room.players
+        .filter((candidate) => candidate.role !== "withdrawn" && candidate.id !== playerId)
+        .sort((a, b) => Number(b.connected) - Number(a.connected) || a.joinedAt - b.joinedAt)[0];
+      if (successor) {
+        this.room.hostId = successor.id;
+        this.room.notice = `${successor.name} is now the host.`;
+      }
+    }
+    if (!this.room.players.some((candidate) => candidate.connected && candidate.role !== "withdrawn")) this.room.emptySince = Date.now();
+    await this.finishRoundIfComplete();
+  }
+
   private async finishRoundIfComplete() {
     if (!this.room || this.room.status !== "round") return false;
-    const ranked = this.room.players.filter((player) => player.role === "active");
+    const ranked = this.room.players.filter((player) => player.role === "active" || (player.role === "withdrawn" && player.assignment));
     if (!ranked.every((player) => player.solved || player.dnf)) return false;
 
     const scores = ranked.map((player) => {
@@ -779,6 +825,9 @@ export class GameRoom {
         avatarUrl: player.avatarUrl,
         connected: player.connected,
         removable: Boolean(!player.connected && player.disconnectedAt && Date.now() - player.disconnectedAt >= PLAYER_RESERVATION),
+        reservationExpiresAt: player.role !== "withdrawn" && !player.connected && player.disconnectedAt
+          ? player.disconnectedAt + PLAYER_RESERVATION
+          : null,
         isHost: player.id === this.room!.hostId,
         ready: player.ready,
         role: player.role,
@@ -885,10 +934,16 @@ export class GameRoom {
   private async scheduleAlarm() {
     if (!this.room) return;
     const times: number[] = [];
+    const now = Date.now();
     const host = this.player(this.room.hostId);
-    if (host?.disconnectedAt) times.push(host.disconnectedAt + HOST_TRANSFER_DELAY);
-    if (this.room.emptySince) times.push(this.room.emptySince + ROOM_EMPTY_TTL);
-    if (times.length > 0) await this.state.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...times)));
+    if (host?.disconnectedAt && host.disconnectedAt + HOST_TRANSFER_DELAY > now) times.push(host.disconnectedAt + HOST_TRANSFER_DELAY);
+    if (this.room.emptySince && this.room.emptySince + ROOM_EMPTY_TTL > now) times.push(this.room.emptySince + ROOM_EMPTY_TTL);
+    for (const player of this.room.players) {
+      if (player.role !== "withdrawn" && !player.connected && player.disconnectedAt && player.disconnectedAt + PLAYER_RESERVATION > now) {
+        times.push(player.disconnectedAt + PLAYER_RESERVATION);
+      }
+    }
+    if (times.length > 0) await this.state.storage.setAlarm(Math.max(now + 1000, Math.min(...times)));
   }
 
   private async destroyRoom(reason: string) {
