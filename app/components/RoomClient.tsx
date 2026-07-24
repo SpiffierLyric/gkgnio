@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { TAGS } from "../../game/catalog";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { filterCatalog, SEED_CATALOG, TAGS } from "../../game/catalog";
 import type { GameSettings, PublicPlayer, RoomCommand, RoomSnapshot } from "../../game/types";
 
 interface Session { playerId: string; resumeToken: string }
@@ -25,6 +25,34 @@ function IdentityImage({ player }: { player: PublicPlayer }) {
 function formatTime(milliseconds: number) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+const PLAYER_NAME_COLORS = ["#d93636", "#e47d28", "#d8bb22", "#2f943f", "#287bd0", "#6752b8", "#b34da8"];
+
+function playerNameColors(playerId: string) {
+  let seed = 0;
+  for (const character of playerId) seed = (seed * 31 + character.charCodeAt(0)) >>> 0;
+
+  const colors: string[] = [];
+  while (colors.length < 3) {
+    const candidate = PLAYER_NAME_COLORS[seed % PLAYER_NAME_COLORS.length];
+    if (!colors.includes(candidate)) colors.push(candidate);
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+  }
+  return colors;
+}
+
+function WavingPlayerName({ name, playerId }: { name: string; playerId: string }) {
+  const colors = playerNameColors(playerId);
+  return (
+    <strong className="roster-player-name" aria-label={name}>
+      {Array.from(name).map((character, index) => (
+        <span aria-hidden="true" className="roster-name-character" data-character={character === " " ? "\u00a0" : character} key={`${character}-${index}`} style={{ animationDelay: `${index * 65}ms`, "--name-stroke-color": colors[index % colors.length] } as CSSProperties}>
+          <span className="roster-name-fill">{character === " " ? "\u00a0" : character}</span>
+        </span>
+      ))}
+    </strong>
+  );
 }
 
 export function RoomClient({ roomName }: { roomName: string }) {
@@ -110,6 +138,12 @@ export function RoomClient({ roomName }: { roomName: string }) {
     socket.send(JSON.stringify({ type: "command", command }));
   }, []);
 
+  const leaveRoom = useCallback(() => {
+    sessionStorage.removeItem(sessionKey(roomName));
+    socketRef.current?.close(1000, "Player left the lobby.");
+    window.location.assign("/");
+  }, [roomName]);
+
   if (connection === "expired") {
     return (
       <main className="room-shell center-screen">
@@ -157,7 +191,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
       {snapshot.notice ? <div className="room-notice panel-sunken">STATUS: {snapshot.notice}</div> : null}
 
       {snapshot.status === "lobby" ? (
-        <Lobby snapshot={snapshot} viewer={viewer} send={send} />
+        <Lobby snapshot={snapshot} viewer={viewer} send={send} onLeave={leaveRoom} />
       ) : (
         <div className="game-layout">
           <section className="board-area">
@@ -200,25 +234,33 @@ export function RoomClient({ roomName }: { roomName: string }) {
   );
 }
 
-function Lobby({ snapshot, viewer, send }: { snapshot: RoomSnapshot; viewer: PublicPlayer; send: (type: string, payload?: unknown) => void }) {
+function Lobby({ snapshot, viewer, send, onLeave }: { snapshot: RoomSnapshot; viewer: PublicPlayer; send: (type: string, payload?: unknown) => void; onLeave: () => void }) {
   const activePlayers = snapshot.players.filter((player) => player.role === "active");
   return (
     <div className="lobby-layout">
       <section className="roster-panel panel-raised">
-        <div className="section-heading compact"><div><p className="eyebrow">CONNECTED UNITS</p><h1>Lobby roster</h1></div><span className="counter">{snapshot.players.length}/{snapshot.playerLimit}</span></div>
+        <div className="section-heading compact"><div><p className="eyebrow">CONNECTED UNITS</p><h1>Lobby roster</h1></div><div className="roster-heading-actions"><span className="counter">{snapshot.players.length}/{snapshot.playerLimit}</span><button className="button button-compact button-danger" onClick={onLeave}>LEAVE</button></div></div>
         <div className="roster-list">
           {snapshot.players.map((player, index) => (
             <div className="roster-row panel-sunken" key={player.id}>
               <span className="roster-index">{String(index + 1).padStart(2, "0")}</span>
-              <strong>{player.name}</strong>
-              <span>{player.isHost ? "HOST" : player.role.toUpperCase()}</span>
-              <span>{player.ready ? "READY" : "NOT READY"}</span>
-              <span>{player.connected ? "ONLINE" : "OFFLINE"}</span>
+              <span className="roster-player">
+                <WavingPlayerName name={player.name} playerId={player.id} />
+                {player.id === viewer.id ? <span className="viewer-marker">YOU</span> : null}
+              </span>
+              <span className="player-role">{player.isHost ? "HOST" : player.role.toUpperCase()}</span>
+              {player.id === viewer.id && player.role === "active" ? (
+                <button className={`ready-status ready-status-button ${player.ready ? "is-ready" : "is-actionable"}`} onClick={() => send("toggle-ready")}>
+                  {player.ready ? <><span className="ready-status-label">READY</span><span className="ready-status-cancel">CANCEL?</span></> : "READY UP"}
+                </button>
+              ) : (
+                <span className={`ready-status ${player.ready ? "is-ready" : "is-not-ready"}`}>{player.ready ? "READY" : "NOT READY"}</span>
+              )}
+              <span className="player-connection">{player.connected ? "ONLINE" : "OFFLINE"}</span>
               {viewer.isHost && player.removable ? <button className="button button-compact" onClick={() => send("remove-player", { playerId: player.id })}>REMOVE</button> : null}
             </div>
           ))}
         </div>
-        {viewer.role === "active" ? <button className={`button button-large ${viewer.ready ? "button-pressed" : "button-primary"}`} onClick={() => send("toggle-ready")}>{viewer.ready ? "READY — CLICK TO CANCEL" : "MARK READY"}</button> : null}
       </section>
       <SettingsPanel snapshot={snapshot} viewer={viewer} send={send} />
       {viewer.isHost ? <button className="button button-primary launch-button" disabled={activePlayers.length < 3 || activePlayers.some((player) => !player.ready) || snapshot.eligibleIdentityCount < activePlayers.length} onClick={() => send("start-match")}>START {snapshot.settings.matchLength}-ROUND MATCH →</button> : <div className="waiting-banner panel-sunken">WAITING FOR HOST TO START</div>}
@@ -230,11 +272,21 @@ function SettingsPanel({ snapshot, viewer, send }: { snapshot: RoomSnapshot; vie
   const disabled = !viewer.isHost;
   const update = (patch: Partial<GameSettings>) => send("update-settings", { ...snapshot.settings, ...patch });
   const facets = useMemo(() => [...new Set(TAGS.map((tag) => tag.facet))], []);
+  const allModeEnabled = snapshot.settings.allTags.length > 0;
+  const eligibleWithAllTag = (tag: string) => filterCatalog(
+    SEED_CATALOG,
+    [...snapshot.settings.allTags, tag],
+    [],
+  ).length;
   const toggleTag = (bucket: "allTags" | "anyTags", tag: string) => {
     const next = snapshot.settings[bucket].includes(tag)
       ? snapshot.settings[bucket].filter((value) => value !== tag)
       : [...snapshot.settings[bucket], tag];
-    update({ [bucket]: next });
+    if (bucket === "allTags") {
+      update({ allTags: next, anyTags: [] });
+      return;
+    }
+    update({ anyTags: next });
   };
   return (
     <section className="settings-panel panel-raised">
@@ -251,8 +303,14 @@ function SettingsPanel({ snapshot, viewer, send }: { snapshot: RoomSnapshot; vie
             {TAGS.filter((tag) => tag.facet === facet).map((tag) => (
               <div className="tag-control" key={tag.slug}>
                 <span>{tag.label}</span>
-                <button type="button" className={snapshot.settings.allTags.includes(tag.slug) ? "selected" : ""} onClick={() => toggleTag("allTags", tag.slug)}>ALL</button>
-                <button type="button" className={snapshot.settings.anyTags.includes(tag.slug) ? "selected" : ""} onClick={() => toggleTag("anyTags", tag.slug)}>ANY</button>
+                <button
+                  type="button"
+                  className={snapshot.settings.allTags.includes(tag.slug) ? "selected" : ""}
+                  disabled={!snapshot.settings.allTags.includes(tag.slug) && eligibleWithAllTag(tag.slug) < 10}
+                  title={!snapshot.settings.allTags.includes(tag.slug) && eligibleWithAllTag(tag.slug) < 10 ? "This ALL filter would leave fewer than 10 identities." : undefined}
+                  onClick={() => toggleTag("allTags", tag.slug)}
+                >ALL</button>
+                <button type="button" className={snapshot.settings.anyTags.includes(tag.slug) ? "selected" : ""} disabled={allModeEnabled} onClick={() => toggleTag("anyTags", tag.slug)}>ANY</button>
               </div>
             ))}
           </fieldset>

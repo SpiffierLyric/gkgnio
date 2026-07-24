@@ -52,7 +52,7 @@ export function GameEntryClient() {
       <form className="entry-panel panel-raised" onSubmit={(event) => submit(event, "host")}>
         <div className="entry-title"><span className="window-control">H</span><div><p className="eyebrow">NEW SESSION</p><h2>Host game</h2></div></div>
         <label>ROOM NAME<input name="roomName" minLength={3} maxLength={32} required placeholder="FRIDAY NIGHT" /></label>
-        <label>PASSWORD<input name="password" type="password" minLength={6} maxLength={64} required placeholder="6+ CHARACTERS" /></label>
+        <label>PASSWORD<input name="password" type="password" minLength={4} maxLength={64} required placeholder="4+ CHARACTERS" /></label>
         <label>YOUR NAME<input name="playerName" maxLength={24} required defaultValue={profile?.name ?? ""} placeholder="PLAYER ONE" /></label>
         <label>PLAYER LIMIT<select name="playerLimit" defaultValue="8">{Array.from({ length: 10 }, (_, index) => index + 3).map((count) => <option key={count}>{count}</option>)}</select></label>
         <button className="button button-primary" disabled={busy !== null}>{busy === "host" ? "CREATING…" : "CREATE ROOM →"}</button>
@@ -61,7 +61,7 @@ export function GameEntryClient() {
       <form className="entry-panel panel-raised" onSubmit={(event) => submit(event, "join")}>
         <div className="entry-title"><span className="window-control">J</span><div><p className="eyebrow">EXISTING SESSION</p><h2>Join game</h2></div></div>
         <label>ROOM NAME<input name="roomName" minLength={3} maxLength={32} required placeholder="ASK YOUR HOST" /></label>
-        <label>PASSWORD<input name="password" type="password" minLength={6} maxLength={64} required placeholder="REQUIRED" /></label>
+        <label>PASSWORD<input name="password" type="password" minLength={4} maxLength={64} required placeholder="REQUIRED" /></label>
         <label>YOUR NAME<input name="playerName" maxLength={24} required defaultValue={profile?.name ?? ""} placeholder="PLAYER TWO" /></label>
         <div className="entry-spacer panel-sunken"><strong>PRIVATE ROOM</strong><span>No public directory. Names are reusable after rooms expire.</span></div>
         <button className="button" disabled={busy !== null}>{busy === "join" ? "JOINING…" : "JOIN ROOM →"}</button>

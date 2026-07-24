@@ -1,11 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterCatalog, SEED_CATALOG } from "../game/catalog";
+import { expandEffectiveTags, filterCatalog, MUSIC_2000S_IDS, SEED_CATALOG, TAGS } from "../game/catalog";
 import { lateJoinPenalty, rankScores } from "../game/scoring";
 
-test("ships exactly 400 unique seed identities", () => {
-  assert.equal(SEED_CATALOG.length, 400);
-  assert.equal(new Set(SEED_CATALOG.map((identity) => identity.id)).size, 400);
+test("ships exactly 750 valid, uniquely named seed identities", () => {
+  assert.equal(SEED_CATALOG.length, 750);
+  assert.equal(new Set(SEED_CATALOG.map((identity) => identity.id)).size, 750);
+  assert.equal(new Set(SEED_CATALOG.map((identity) => identity.canonicalName.normalize("NFKC").toLocaleLowerCase())).size, 750);
+  const validTags = new Set(TAGS.map((tag) => tag.slug));
+  assert.ok(SEED_CATALOG.every((identity) => identity.tags.every((tag) => validTags.has(tag))));
+  assert.ok(SEED_CATALOG.every((identity) => identity.sourceUrl.startsWith("https://en.wikipedia.org/wiki/")));
+});
+
+test("tag implications are cycle-free and every selectable tag has 20 effective identities", () => {
+  const definitions = new Map(TAGS.map((tag) => [tag.slug, tag]));
+  function visit(slug: string, active = new Set<string>(), seen = new Set<string>()) {
+    assert.ok(!active.has(slug), `implication cycle at ${slug}`);
+    if (seen.has(slug)) return;
+    active.add(slug);
+    for (const implied of definitions.get(slug)?.implies ?? []) visit(implied, active, seen);
+    active.delete(slug);
+    seen.add(slug);
+  }
+  for (const tag of TAGS) visit(tag.slug);
+  for (const tag of TAGS) {
+    const count = SEED_CATALOG.filter((identity) => expandEffectiveTags(identity.tags).includes(tag.slug)).length;
+    assert.ok(count >= 20, `${tag.slug} only has ${count} effective identities`);
+  }
+});
+
+test("music expansion has required identities and 2000s coverage", () => {
+  const kanye = SEED_CATALOG.find((identity) => identity.canonicalName === "Kanye West");
+  assert.ok(kanye?.aliases.includes("Ye"));
+  assert.ok(expandEffectiveTags(kanye?.tags ?? []).includes("musician"));
+  const daftPunk = SEED_CATALOG.find((identity) => identity.canonicalName === "Daft Punk");
+  assert.equal(daftPunk?.kind, "group");
+  for (const tag of ["group-duo", "musician", "music"]) assert.ok(expandEffectiveTags(daftPunk?.tags ?? []).includes(tag));
+  const musicians = SEED_CATALOG.filter((identity) => expandEffectiveTags(identity.tags).includes("musician"));
+  assert.ok(musicians.length >= 80);
+  assert.ok(musicians.filter((identity) => MUSIC_2000S_IDS.has(identity.id)).length >= 35);
 });
 
 test("category builder applies ALL and ANY buckets", () => {
@@ -14,6 +47,11 @@ test("category builder applies ALL and ANY buckets", () => {
   assert.ok(result.some((identity) => identity.canonicalName === "SpongeBob SquarePants"));
   assert.ok(result.every((identity) => identity.tags.includes("anime") || identity.tags.includes("spongebob")));
   assert.ok(!result.some((identity) => identity.canonicalName === "Adam Sandler"));
+});
+
+test("ALL filters can be checked against the ten-identity minimum", () => {
+  assert.ok(filterCatalog(SEED_CATALOG, ["fictional-character", "anime"], []).length >= 10);
+  assert.ok(filterCatalog(SEED_CATALOG, ["fictional-character", "anime", "spongebob"], []).length < 10);
 });
 
 test("tag implications make role filters include real people", () => {

@@ -266,7 +266,7 @@ export class GameRoom {
     if (roomName.length < 3 || roomName.length > 32 || playerName.length < 1 || playerName.length > 24) {
       return json({ error: "Check the room and player names." }, 400);
     }
-    if (!body.password || body.password.length < 6 || body.password.length > 64 || playerLimit < 3 || playerLimit > 12) {
+    if (!body.password || body.password.length < 4 || body.password.length > 64 || playerLimit < 3 || playerLimit > 12) {
       return json({ error: "Check the password and player limit." }, 400);
     }
 
@@ -472,18 +472,25 @@ export class GameRoom {
     if (matchLength < 1 || matchLength > 10) return "Match length must be between 1 and 10.";
     if (timerSeconds !== null && (timerSeconds < 60 || timerSeconds > 300)) return "Timer must be off or between 60 and 300 seconds.";
     if (turnCap !== null && (turnCap < 3 || turnCap > 20)) return "Turn cap must be off or between 3 and 20.";
+    const allTags = [...new Set(update.allTags ?? this.room.settings.allTags)];
+    // ALL and ANY are mutually exclusive modes. Selecting an ALL filter
+    // deliberately clears any OR filters that were previously selected.
+    const anyTags = allTags.length > 0 ? [] : [...new Set(update.anyTags ?? this.room.settings.anyTags)];
+    const catalog = await this.loadCatalog();
+    const eligibleIdentityCount = filterCatalog(catalog, allTags, anyTags).length;
+    const allTagsChanged = allTags.length !== this.room.settings.allTags.length
+      || allTags.some((tag) => !this.room!.settings.allTags.includes(tag));
+    if (allTagsChanged && eligibleIdentityCount < 10) {
+      return "ALL filters must leave at least 10 eligible identities.";
+    }
     this.room.settings = {
       matchLength,
       timerSeconds,
       turnCap,
-      allTags: [...new Set(update.allTags ?? this.room.settings.allTags)],
-      anyTags: [...new Set(update.anyTags ?? this.room.settings.anyTags)],
+      allTags,
+      anyTags,
     };
-    this.room.eligibleIdentityCount = filterCatalog(
-      await this.loadCatalog(),
-      this.room.settings.allTags,
-      this.room.settings.anyTags,
-    ).length;
+    this.room.eligibleIdentityCount = eligibleIdentityCount;
     return null;
   }
 

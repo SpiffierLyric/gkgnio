@@ -40,7 +40,7 @@ test("server-renders the organized built-in identity browser", async () => {
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Identity browser/i);
-  assert.match(html, /400(?:<!-- -->)? BUILT IN/i);
+  assert.match(html, /750(?:<!-- -->)? BUILT IN/i);
   assert.match(html, /ALL IDENTITIES/i);
   assert.match(html, /Mario/i);
   assert.match(html, /Adam Sandler/i);

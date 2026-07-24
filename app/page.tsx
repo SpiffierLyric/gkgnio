@@ -12,12 +12,11 @@ export default function Home() {
           dotSpacing={14}
           cursorRadius={380}
           bulgeStrength={92}
-          glowRadius={160}
+          glowRadius={0}
           sparkle
           waveAmplitude={3}
-          gradientFrom="#808080"
-          gradientTo="#808080"
-          glowColor="#f1f1f1"
+          gradientFrom="#626262"
+          gradientTo="#626262"
         />
       </div>
       <div className="home-content">
