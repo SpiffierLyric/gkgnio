@@ -30,6 +30,7 @@ interface InternalPlayer {
   solved: boolean;
   dnf: boolean;
   roundTurns: number;
+  turnSlots: number;
   roundSlots: number;
   totalStrokes: number;
   totalSlots: number;
@@ -286,6 +287,7 @@ export class GameRoom {
       solved: false,
       dnf: false,
       roundTurns: 0,
+      turnSlots: 0,
       roundSlots: 0,
       totalStrokes: 0,
       totalSlots: 0,
@@ -358,6 +360,7 @@ export class GameRoom {
       solved: false,
       dnf: false,
       roundTurns: 0,
+      turnSlots: 0,
       roundSlots: 0,
       totalStrokes: 0,
       totalSlots: 0,
@@ -532,6 +535,7 @@ export class GameRoom {
       player.solved = false;
       player.dnf = false;
       player.roundTurns = 0;
+      player.turnSlots = 0;
       player.roundSlots = 0;
       player.totalStrokes = 0;
       player.totalSlots = 0;
@@ -563,6 +567,7 @@ export class GameRoom {
       player.solved = false;
       player.dnf = false;
       player.roundTurns = 0;
+      player.turnSlots = 0;
       player.roundSlots = 0;
       player.ready = false;
       this.room!.usedIdentityIds.push(assignments[index].id);
@@ -579,7 +584,7 @@ export class GameRoom {
     if (this.room.activePlayerId) {
       const active = this.player(this.room.activePlayerId);
       const overtime = this.room.turnDeadlineAt !== null && Date.now() >= this.room.turnDeadlineAt;
-      const mayAdvance = !active || active.solved || active.dnf || active.role === "withdrawn" || active.roundSlots >= 2 || this.room.turnYielded || overtime;
+      const mayAdvance = !active || active.solved || active.dnf || active.role === "withdrawn" || active.turnSlots >= 2 || this.room.turnYielded || overtime;
       if (!mayAdvance) return "The current player still has the turn.";
       if (active && !active.solved && this.room.settings.turnCap !== null && active.roundTurns >= this.room.settings.turnCap) {
         active.dnf = true;
@@ -594,6 +599,7 @@ export class GameRoom {
     this.room.activePlayerId = playerId;
     this.room.turnYielded = false;
     player.roundTurns += 1;
+    player.turnSlots = 0;
     this.room.turnDeadlineAt = this.room.settings.timerSeconds === null ? null : Date.now() + this.room.settings.timerSeconds * 1000;
     this.room.notice = `${player.name} is asking questions.`;
     return null;
@@ -602,9 +608,10 @@ export class GameRoom {
   private useQuestion(playerId: string) {
     if (!this.room || this.room.activePlayerId !== playerId || this.room.vote) return "You do not control the active turn.";
     const player = this.player(playerId);
-    if (!player || player.roundSlots >= 2) return "Both question slots are already used.";
+    if (!player || player.turnSlots >= 2) return "Both question slots are already used.";
+    player.turnSlots += 1;
     player.roundSlots += 1;
-    if (player.roundSlots >= 2) this.room.turnYielded = true;
+    if (player.turnSlots >= 2) this.room.turnYielded = true;
     return null;
   }
 
@@ -612,7 +619,8 @@ export class GameRoom {
     if (!this.room || this.room.activePlayerId !== playerId || this.room.vote) return "You cannot guess right now.";
     const player = this.player(playerId);
     const normalizedGuess = normalizeName(guessText);
-    if (!player || player.roundSlots >= 2 || normalizedGuess.length < 1 || normalizedGuess.length > 80) return "Enter a guess while a question slot is available.";
+    if (!player || player.turnSlots >= 2 || normalizedGuess.length < 1 || normalizedGuess.length > 80) return "Enter a guess while a question slot is available.";
+    player.turnSlots += 1;
     player.roundSlots += 1;
     const remainingMs = this.room.turnDeadlineAt === null ? null : Math.max(0, this.room.turnDeadlineAt - Date.now());
     this.room.vote = { guesserId: playerId, guessText: normalizedGuess, votes: {}, openedAt: Date.now(), remainingMs };
@@ -657,7 +665,7 @@ export class GameRoom {
       await this.finishRoundIfComplete();
     } else {
       this.room.turnDeadlineAt = vote.remainingMs === null ? null : Date.now() + vote.remainingMs;
-      this.room.turnYielded = player.roundSlots >= 2;
+      this.room.turnYielded = player.turnSlots >= 2;
       this.room.notice = `${player.name}'s guess was voted wrong.`;
     }
   }
@@ -785,6 +793,7 @@ export class GameRoom {
               }
             : null,
         roundTurns: player.roundTurns,
+        turnSlots: player.turnSlots,
         roundSlots: player.roundSlots,
         totalStrokes: player.totalStrokes,
         totalSlots: player.totalSlots,

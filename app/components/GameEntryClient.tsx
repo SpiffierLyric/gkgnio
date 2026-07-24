@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 
 interface Profile { name: string; avatarUrl?: string }
 
+async function roomResponse(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("The game service returned an invalid response. Please try again shortly.");
+  }
+  return response.json() as Promise<{ roomName: string; playerId: string; resumeToken: string; error?: string }>;
+}
+
 function sessionKey(roomName: string) {
   return `spiffier-room:${roomName.trim().toLocaleLowerCase()}`;
 }
@@ -37,7 +45,7 @@ export function GameEntryClient() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await roomResponse(response);
       if (!response.ok) throw new Error(data.error ?? "Unable to enter the room.");
       sessionStorage.setItem(sessionKey(data.roomName), JSON.stringify({ playerId: data.playerId, resumeToken: data.resumeToken }));
       router.push(`/room/${encodeURIComponent(data.roomName)}`);

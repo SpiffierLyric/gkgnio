@@ -56,6 +56,7 @@ export interface PublicPlayer {
   dnf: boolean;
   identity: PublicIdentity | null;
   roundTurns: number;
+  turnSlots: number;
   roundSlots: number;
   totalStrokes: number;
   totalSlots: number;

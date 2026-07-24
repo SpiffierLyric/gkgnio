@@ -88,6 +88,30 @@ try {
   await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.revision >= started.revision)));
   await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.status === "round")));
 
+  await clients[0].command("take-turn");
+  await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.activePlayerId === sessions[0].playerId)));
+  await clients[0].command("use-question");
+  await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.players.find((player) => player.id === sessions[0].playerId)?.turnSlots === 1)));
+  await clients[0].command("submit-guess", { guessText: "Not my identity" });
+  await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.vote !== null)));
+  await clients[1].command("cast-vote", { vote: "wrong" });
+  await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.vote?.submittedCount === 1)));
+  await clients[2].command("cast-vote", { vote: "wrong" });
+  await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.vote === null && snapshot.turnYielded)));
+
+  for (const index of [1, 2]) {
+    await clients[index].command("take-turn");
+    await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.activePlayerId === sessions[index].playerId)));
+    await clients[index].command("yield-turn");
+    await Promise.all(clients.map((client) => client.waitFor((snapshot) => snapshot.turnYielded)));
+  }
+  await clients[0].command("take-turn");
+  const secondTurn = await clients[0].waitFor((snapshot) => snapshot.activePlayerId === sessions[0].playerId);
+  const host = secondTurn.players.find((player) => player.id === sessions[0].playerId);
+  if (!host || host.turnSlots !== 0 || host.roundSlots !== 2) throw new Error("A new turn did not reset the two available question slots while preserving the round score.");
+  await clients[0].command("use-question");
+  await clients[0].waitFor((snapshot) => snapshot.players.find((player) => player.id === sessions[0].playerId)?.turnSlots === 1);
+
   for (const client of clients) {
     const ownPlayer = client.snapshot.players.find((player) => player.id === client.snapshot.viewerId);
     const otherPlayers = client.snapshot.players.filter((player) => player.id !== client.snapshot.viewerId);

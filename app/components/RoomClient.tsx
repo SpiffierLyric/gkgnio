@@ -175,7 +175,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
   const deadlineRemaining = snapshot.turnDeadlineAt === null ? null : snapshot.turnDeadlineAt - now;
   const overtime = deadlineRemaining !== null && deadlineRemaining <= 0;
   const canTake = viewer.id === snapshot.nextPlayerId && !snapshot.vote && (
-    !active || snapshot.turnYielded || active.roundSlots >= 2 || active.solved || overtime
+    !active || snapshot.turnYielded || active.turnSlots >= 2 || active.solved || overtime
   );
 
   return (
@@ -215,7 +215,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
               <p className="eyebrow">ACTIVE TURN</p>
               <h2>{active?.name ?? (next ? `${next.name} is next` : "Round complete")}</h2>
               <div className="timer panel-sunken">{deadlineRemaining === null ? "NO LIMIT" : overtime ? `+${formatTime(Math.abs(deadlineRemaining))}` : formatTime(deadlineRemaining)}</div>
-              {active ? <p>{2 - active.roundSlots} question slot{2 - active.roundSlots === 1 ? "" : "s"} remaining</p> : <p>Waiting for the next player to take control.</p>}
+              {active ? <p>{2 - active.turnSlots} question slot{2 - active.turnSlots === 1 ? "" : "s"} remaining</p> : <p>Waiting for the next player to take control.</p>}
               {active?.id === viewer.id && !snapshot.vote ? <ActiveControls active={active} send={send} /> : null}
               {canTake ? <button className="button button-primary button-large" onClick={() => send("take-turn")}>TAKE TURN →</button> : null}
               {viewer.isHost && overtime && deadlineRemaining !== null && Math.abs(deadlineRemaining) >= 20_000 ? (
@@ -324,11 +324,11 @@ function ActiveControls({ active, send }: { active: PublicPlayer; send: (type: s
   const [guess, setGuess] = useState("");
   return (
     <div className="active-controls">
-      <button className="button" disabled={active.roundSlots >= 2} onClick={() => send("use-question")}>QUESTION USED ({active.roundSlots}/2)</button>
+      <button className="button" disabled={active.turnSlots >= 2} onClick={() => send("use-question")}>QUESTION USED ({active.turnSlots}/2)</button>
       <form onSubmit={(event) => { event.preventDefault(); if (guess.trim()) { send("submit-guess", { guessText: guess }); setGuess(""); } }}>
         <label htmlFor="guess">AM I…?</label>
-        <input id="guess" value={guess} maxLength={80} disabled={active.roundSlots >= 2} onChange={(event) => setGuess(event.target.value)} placeholder="TYPE THE IDENTITY" />
-        <button className="button button-primary" disabled={!guess.trim() || active.roundSlots >= 2}>SUBMIT GUESS</button>
+        <input id="guess" value={guess} maxLength={80} disabled={active.turnSlots >= 2} onChange={(event) => setGuess(event.target.value)} placeholder="TYPE THE IDENTITY" />
+        <button className="button button-primary" disabled={!guess.trim() || active.turnSlots >= 2}>SUBMIT GUESS</button>
       </form>
       <button className="button" onClick={() => send("yield-turn")}>YIELD TURN</button>
     </div>
