@@ -74,7 +74,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
   }, []);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(sessionKey(roomName));
+    const stored = localStorage.getItem(sessionKey(roomName));
     if (!stored) {
       queueMicrotask(() => setConnection("expired"));
       return;
@@ -100,8 +100,11 @@ export function RoomClient({ roomName }: { roomName: string }) {
           setSnapshot(message.snapshot);
           setError("");
         } else if (message.type === "error") setError(message.message ?? "The room rejected that action.");
-        else if (message.type === "closed") {
-          sessionStorage.removeItem(sessionKey(roomName));
+        else if (message.type === "left") {
+          localStorage.removeItem(sessionKey(roomName));
+          window.location.assign("/");
+        } else if (message.type === "closed") {
+          localStorage.removeItem(sessionKey(roomName));
           setConnection("expired");
           setError(message.message ?? "The room closed.");
         }
@@ -138,11 +141,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
     socket.send(JSON.stringify({ type: "command", command }));
   }, []);
 
-  const leaveRoom = useCallback(() => {
-    sessionStorage.removeItem(sessionKey(roomName));
-    socketRef.current?.close(1000, "Player left the lobby.");
-    window.location.assign("/");
-  }, [roomName]);
+  const leaveRoom = useCallback(() => send("leave"), [send]);
 
   if (connection === "expired") {
     return (
@@ -184,14 +183,14 @@ export function RoomClient({ roomName }: { roomName: string }) {
         <div><span className={`connection-light ${connection}`} /> ROOM: <strong>{snapshot.roomName}</strong></div>
         <div>MATCH {Math.max(1, snapshot.roundNumber)} / {snapshot.settings.matchLength}</div>
         <div>{viewer.isHost ? "HOST CONTROL" : viewer.role.toUpperCase()}</div>
-        <Link href="/">×</Link>
+        <button className="titlebar-exit" aria-label="Leave room" onClick={leaveRoom}>×</button>
       </header>
 
       {error ? <div className="room-error" role="alert">{error}<button onClick={() => setError("")}>DISMISS</button></div> : null}
       {snapshot.notice ? <div className="room-notice panel-sunken">STATUS: {snapshot.notice}</div> : null}
 
       {snapshot.status === "lobby" ? (
-        <Lobby snapshot={snapshot} viewer={viewer} send={send} onLeave={leaveRoom} />
+        <Lobby snapshot={snapshot} viewer={viewer} send={send} onLeave={leaveRoom} now={now} />
       ) : (
         <div className="game-layout">
           <section className="board-area">
@@ -234,7 +233,7 @@ export function RoomClient({ roomName }: { roomName: string }) {
   );
 }
 
-function Lobby({ snapshot, viewer, send, onLeave }: { snapshot: RoomSnapshot; viewer: PublicPlayer; send: (type: string, payload?: unknown) => void; onLeave: () => void }) {
+function Lobby({ snapshot, viewer, send, onLeave, now }: { snapshot: RoomSnapshot; viewer: PublicPlayer; send: (type: string, payload?: unknown) => void; onLeave: () => void; now: number }) {
   const activePlayers = snapshot.players.filter((player) => player.role === "active");
   return (
     <div className="lobby-layout">
@@ -256,7 +255,7 @@ function Lobby({ snapshot, viewer, send, onLeave }: { snapshot: RoomSnapshot; vi
               ) : (
                 <span className={`ready-status ${player.ready ? "is-ready" : "is-not-ready"}`}>{player.ready ? "READY" : "NOT READY"}</span>
               )}
-              <span className="player-connection">{player.connected ? "ONLINE" : "OFFLINE"}</span>
+              <span className="player-connection">{player.connected ? "ONLINE" : player.reservationExpiresAt && !player.removable ? `RECONNECT ${formatTime(player.reservationExpiresAt - now)}` : "OFFLINE"}</span>
               {viewer.isHost && player.removable ? <button className="button button-compact" onClick={() => send("remove-player", { playerId: player.id })}>REMOVE</button> : null}
             </div>
           ))}

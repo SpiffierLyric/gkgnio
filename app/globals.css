@@ -149,7 +149,7 @@ textarea { resize: vertical; }
 
 .room-titlebar { align-items: center; display: grid; font: 700 .72rem "Courier New", monospace; gap: 10px; grid-template-columns: 2fr 1fr 1fr auto; margin-bottom: 10px; min-height: 48px; padding: 8px 12px; }
 .room-titlebar > div { border-right: 1px solid var(--gray-700); }
-.room-titlebar > a { align-items: center; background: var(--black); color: var(--white); display: flex; font-size: 1.4rem; height: 30px; justify-content: center; text-decoration: none; width: 30px; }
+.room-titlebar > .titlebar-exit { align-items: center; background: var(--black); border: 0; color: var(--white); cursor: pointer; display: flex; font: inherit; font-size: 1.4rem; height: 30px; justify-content: center; text-decoration: none; width: 30px; }
 .connection-light { background: var(--gray-500); border: 1px solid var(--black); display: inline-block; height: 10px; margin-right: 5px; width: 10px; }
 .connection-light.online { background: var(--white); box-shadow: inset 0 0 0 2px var(--black); }
 .connection-light.offline { background: repeating-linear-gradient(45deg, #000, #000 2px, #fff 2px, #fff 4px); }

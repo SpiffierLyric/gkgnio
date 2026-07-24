@@ -10,7 +10,7 @@ async function roomResponse(response: Response) {
   if (!contentType.includes("application/json")) {
     throw new Error("The game service returned an invalid response. Please try again shortly.");
   }
-  return response.json() as Promise<{ roomName: string; playerId: string; resumeToken: string; error?: string }>;
+  return response.json() as Promise<{ roomName: string; playerId: string; resumeToken: string; reclaimed?: boolean; error?: string }>;
 }
 
 function sessionKey(roomName: string) {
@@ -47,7 +47,7 @@ export function GameEntryClient() {
       });
       const data = await roomResponse(response);
       if (!response.ok) throw new Error(data.error ?? "Unable to enter the room.");
-      sessionStorage.setItem(sessionKey(data.roomName), JSON.stringify({ playerId: data.playerId, resumeToken: data.resumeToken }));
+      localStorage.setItem(sessionKey(data.roomName), JSON.stringify({ playerId: data.playerId, resumeToken: data.resumeToken }));
       router.push(`/room/${encodeURIComponent(data.roomName)}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to enter the room.");
@@ -72,7 +72,7 @@ export function GameEntryClient() {
         <label>PASSWORD<input name="password" type="password" minLength={4} maxLength={64} required placeholder="REQUIRED" /></label>
         <label>YOUR NAME<input name="playerName" maxLength={24} required defaultValue={profile?.name ?? ""} placeholder="PLAYER TWO" /></label>
         <div className="entry-spacer panel-sunken"><strong>PRIVATE ROOM</strong><span>No public directory. Names are reusable after rooms expire.</span></div>
-        <button className="button" disabled={busy !== null}>{busy === "join" ? "JOINING…" : "JOIN ROOM →"}</button>
+        <button className="button" disabled={busy !== null}>{busy === "join" ? "JOINING…" : "JOIN OR RECONNECT →"}</button>
       </form>
       {error ? <p className="form-error" role="alert">ERROR: {error}</p> : null}
     </section>
