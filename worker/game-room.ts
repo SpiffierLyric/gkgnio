@@ -980,7 +980,12 @@ export class GameRoom {
     // the runtime exposes the alarm API.
     const setAlarm = this.state.storage.setAlarm;
     if (times.length > 0 && typeof setAlarm === "function") {
-      await setAlarm.call(this.state.storage, Math.max(now + 1000, Math.min(...times)));
+      try {
+        await setAlarm.call(this.state.storage, Math.max(now + 1000, Math.min(...times)));
+      } catch {
+        // Hosted runtimes may expose the method before enabling alarms. Room
+        // creation and play must remain available without background cleanup.
+      }
     }
   }
 

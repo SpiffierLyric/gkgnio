@@ -80,6 +80,21 @@ test("room creation remains available when the runtime has no alarm API", async 
   assert.equal(response.status, 201);
 });
 
+test("room creation remains available when the runtime rejects cleanup alarms", async () => {
+  const { room } = roomHarness();
+  const state = (room as never as { state: { storage: { setAlarm: (time: number) => Promise<void> } } }).state;
+  state.storage.setAlarm = async () => { throw new Error("Alarms are unavailable"); };
+
+  const response = await post(room, "create", {
+    roomName: "Alarm rejection",
+    password: "secret",
+    playerLimit: 3,
+    playerName: "Host",
+  });
+
+  assert.equal(response.status, 201);
+});
+
 test("diagnostic records keep only the public-safe rolling service metadata", async () => {
   const { room } = roomHarness();
   const record = await room.fetch(new Request("https://room.internal/diagnostics/record", {
