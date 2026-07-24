@@ -79,3 +79,28 @@ test("room creation remains available when the runtime has no alarm API", async 
 
   assert.equal(response.status, 201);
 });
+
+test("diagnostic records keep only the public-safe rolling service metadata", async () => {
+  const { room } = roomHarness();
+  const record = await room.fetch(new Request("https://room.internal/diagnostics/record", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      event: "room-service-invalid-response",
+      route: "/api/rooms/create",
+      status: 500,
+      contentType: "text/plain; charset=utf-8",
+      requestId: "5b05e0e5-bf10-49e0-a084-cfb2f7e3c6a7",
+      password: "must-not-be-stored",
+    }),
+  }));
+  assert.equal(record.status, 202);
+
+  const list = await room.fetch(new Request("https://room.internal/diagnostics/list"));
+  const data = await list.json() as { available: boolean; records: Array<Record<string, unknown>> };
+  assert.equal(data.available, true);
+  assert.equal(data.records.length, 1);
+  assert.deepEqual(Object.keys(data.records[0]).sort(), ["contentType", "event", "id", "occurredAt", "requestId", "route", "status"]);
+  assert.equal(data.records[0].contentType, "text/plain");
+  assert.equal(data.records[0].route, "/api/rooms/create");
+});

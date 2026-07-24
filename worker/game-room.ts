@@ -74,6 +74,16 @@ interface SocketAttachment {
   playerId?: string;
 }
 
+interface DiagnosticEvent {
+  id: string;
+  occurredAt: string;
+  event: string;
+  route: string;
+  status: number | null;
+  contentType: string | null;
+  requestId: string;
+}
+
 function defaultSettings(): GameSettings {
   return {
     matchLength: 3,
@@ -134,6 +144,7 @@ function shuffled<T>(values: T[]) {
 
 export class GameRoom {
   private room: RoomData | null = null;
+  private diagnostics: DiagnosticEvent[] = [];
   private readonly ready: Promise<void>;
 
   constructor(
@@ -142,6 +153,7 @@ export class GameRoom {
   ) {
     this.ready = this.state.blockConcurrencyWhile(async () => {
       this.room = (await this.state.storage.get<RoomData>("room")) ?? null;
+      this.diagnostics = (await this.state.storage.get<DiagnosticEvent[]>("diagnostics")) ?? [];
       if (this.room) {
         const connectedIds = new Set(
           this.state
@@ -158,6 +170,8 @@ export class GameRoom {
     await this.ready;
     const url = new URL(request.url);
 
+    if (url.pathname === "/diagnostics/record" && request.method === "POST") return this.recordDiagnostic(request);
+    if (url.pathname === "/diagnostics/list" && request.method === "GET") return json({ records: this.diagnostics.slice().reverse(), available: true });
     if (url.pathname.endsWith("/create") && request.method === "POST") return this.create(request);
     if (url.pathname.endsWith("/join") && request.method === "POST") return this.join(request);
     if (url.pathname.endsWith("/socket") && request.headers.get("upgrade") === "websocket") {
@@ -319,6 +333,23 @@ export class GameRoom {
     await this.persist();
     await this.scheduleAlarm();
     return json({ roomName, playerId: host.id, resumeToken: token }, 201);
+  }
+
+  private async recordDiagnostic(request: Request) {
+    const body = (await request.json()) as Partial<Omit<DiagnosticEvent, "id" | "occurredAt">>;
+    const event = body.event === "room-service-exception" || body.event === "room-service-invalid-response"
+      ? body.event
+      : "room-service-invalid-response";
+    const route = body.route === "/api/rooms/create" || body.route === "/api/rooms/join" ? body.route : "/api/rooms/unknown";
+    const status = typeof body.status === "number" && Number.isInteger(body.status) && body.status >= 100 && body.status <= 599 ? body.status : null;
+    const contentType = typeof body.contentType === "string"
+      ? body.contentType.split(";", 1)[0].toLowerCase().replace(/[^a-z0-9./+-]/g, "").slice(0, 80) || null
+      : null;
+    const requestId = typeof body.requestId === "string" && /^[a-f0-9-]{8,64}$/i.test(body.requestId) ? body.requestId : crypto.randomUUID();
+    this.diagnostics.push({ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), event, route, status, contentType, requestId });
+    this.diagnostics = this.diagnostics.slice(-100);
+    await this.state.storage.put("diagnostics", this.diagnostics);
+    return json({ ok: true }, 202);
   }
 
   private async join(request: Request) {

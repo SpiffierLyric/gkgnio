@@ -95,7 +95,7 @@ test("room API validation errors are JSON", async () => {
   assert.deepEqual(await response.json(), { error: "Check the room name." });
 });
 
-test("the diagnostics API is safe when persistent log storage is unavailable", async () => {
+test("the diagnostics API is safe when its storage service is unavailable", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("diagnostics-test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
